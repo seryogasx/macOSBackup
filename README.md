@@ -1,0 +1,3 @@
+# author: Sergio Petrov (seryogasx)
+
+macOsBackup is a cmd tool to easy backup your files...
