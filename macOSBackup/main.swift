@@ -29,7 +29,9 @@ enum BackuperError: Error {
 // MARK: BackupState
 struct BackupInfo {
     var hashName: String
-    var FullBackupDate: Date
+    var dedDate: Date
+    var dadDate: Date
+    var sonDate: Date
 }
 
 
@@ -51,49 +53,63 @@ class Database {
         if sqlite3_open(dbUrl.path, &db) != SQLITE_OK {
             print("Error opening database")
         }
+        tableInit()
     }
     
     func tableInit() {
-        let query = "CREATE TABLE IF NOT EXISTS BackupInfo (BackupName varchar(64) primary key, ModificationDate integer); "
+        let query = "CREATE TABLE IF NOT EXISTS BackupInfo (BackupName varchar(64) primary key, dedDate integer, dadDate integer, sonDate ineteger); "
         
         if sqlite3_exec(db, query, nil, nil, nil) != SQLITE_OK {
             print("Error creating Tables!")
         }
-        sqlite3_finalize(statement)
     }
     
-    func addBackupInfo(info: BackupInfo) {
-        tableInit();
-        var query = "SELECT * FROM BackupInfo WHERE BackupName=?"
-        var lastFullBackupDate: Int32?
+    func addNewItem(info: BackupInfo) {
+        let query = "INSERT INTO BackupInfo (BackupName, dedDate, dadDate, sonDate) VALUES (?, ?, ?, ?)"
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
             sqlite3_bind_text(statement, 1, info.hashName, -1, nil)
+            sqlite3_bind_int(statement, 2, Int32(info.dedDate.timeIntervalSince1970))
+            sqlite3_bind_int(statement, 3, Int32(info.dadDate.timeIntervalSince1970))
+            sqlite3_bind_int(statement, 4, Int32(info.sonDate.timeIntervalSince1970))
             
-            if sqlite3_step(statement) == SQLITE_ROW {
-                lastFullBackupDate = sqlite3_column_int(statement, 1)
+            if sqlite3_step(statement) != SQLITE_DONE {
+                print("Error add new item to database!")
             }
         }
-        
-        if let _ = lastFullBackupDate {
-            query = "UPDATE BackupInfo SET ModificationDate=? WHERE BackupName=?"
-            if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_int(statement, 1, Int32(info.FullBackupDate.timeIntervalSince1970))
-                sqlite3_bind_text(statement, 2, info.hashName, -1, nil)
-                
-                if sqlite3_step(statement) != SQLITE_DONE {
-                    print("Error update database!")
-                }
+    }
+    
+    func updateSonDate(name: String, date: Date) {
+        let query = "UPDATE BackupInfo SET sonDate=? WHERE BackupName=?"
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_int(statement, 1, Int32(date.timeIntervalSince1970))
+            sqlite3_bind_text(statement, 2, name, -1, nil)
+            
+            if sqlite3_step(statement) != SQLITE_DONE {
+                print("Error update database!")
             }
         }
-        else {
-            query = "INSERT INTO BackupInfo (BackupName, ModificationDate) VALUES (?, ?)"
-            if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-                sqlite3_bind_text(statement, 1, info.hashName, -1, nil)
-                sqlite3_bind_int(statement, 2, Int32(info.FullBackupDate.timeIntervalSince1970))
-                
-                if sqlite3_step(statement) != SQLITE_DONE {
-                    print("Error add to database!")
-                }
+    }
+    
+    func updateDadDate(name: String, date: Date) {
+        let query = "UPDATE BackupInfo SET dadDate=? WHERE BackupName=?"
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_int(statement, 1, Int32(date.timeIntervalSince1970))
+            sqlite3_bind_text(statement, 2, name, -1, nil)
+            
+            if sqlite3_step(statement) != SQLITE_DONE {
+                print("Error update database!")
+            }
+        }
+    }
+    
+    func updateDedDate(name: String, date: Date) {
+        let query = "UPDATE BackupInfo SET dedDate=? WHERE BackupName=?"
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_int(statement, 1, Int32(date.timeIntervalSince1970))
+            sqlite3_bind_text(statement, 2, name, -1, nil)
+            
+            if sqlite3_step(statement) != SQLITE_DONE {
+                print("Error update database!")
             }
         }
     }
@@ -173,7 +189,8 @@ class Backuper {
     }
     
     private func firstBackup() throws {
-        db.addBackupInfo(info: BackupInfo(hashName: sourceIdentifier, FullBackupDate: Date()))
+        let currDate = Date()
+        db.addNewItem(info: BackupInfo(hashName: sourceIdentifier, dedDate: currDate, dadDate: currDate, sonDate: currDate))
         for i in backupItemsList {
             try fm.copyItem(atPath: i.fullPath, toPath: dedDestinationPath + "/" + i.name)
         }
