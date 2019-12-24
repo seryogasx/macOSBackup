@@ -28,6 +28,12 @@ enum BackuperError: Error {
 
 // MARK: BackupState
 struct BackupInfo {
+    
+    enum BackupType: Int {
+        case ded = 1
+        case dad = 2
+        case son = 3
+    }
     var hashName: String
     var dedDate: Date
     var dadDate: Date
@@ -78,8 +84,18 @@ class Database {
         }
     }
     
-    func updateSonDate(name: String, date: Date) {
-        let query = "UPDATE BackupInfo SET sonDate=? WHERE BackupName=?"
+    func updateDate(name: String, date: Date, type: BackupInfo.BackupType) {
+        var mode = ""
+        switch type.rawValue {
+        case 1:
+            mode="dedDate"
+        case 2:
+            mode="dadDate"
+        case 3:
+            mode="sonDate"
+        default: ()
+        }
+        let query = "UPDATE BackupInfo SET \(mode)=? WHERE BackupName=?"
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
             sqlite3_bind_int(statement, 1, Int32(date.timeIntervalSince1970))
             sqlite3_bind_text(statement, 2, name, -1, nil)
@@ -90,28 +106,27 @@ class Database {
         }
     }
     
-    func updateDadDate(name: String, date: Date) {
-        let query = "UPDATE BackupInfo SET dadDate=? WHERE BackupName=?"
+    func getDate(name: String, type: BackupInfo.BackupType) -> Int? {
+        var date: Int?
+        var mode = ""
+        switch type.rawValue {
+        case 1:
+            mode="dedDate"
+        case 2:
+            mode="dadDate"
+        case 3:
+            mode="sonDate"
+        default: ()
+        }
+        let query = "SELECT \(mode) FROM BackupInfo WHERE BackupName=?"
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_int(statement, 1, Int32(date.timeIntervalSince1970))
-            sqlite3_bind_text(statement, 2, name, -1, nil)
+            sqlite3_bind_text(statement, 1, name, -1, nil)
             
-            if sqlite3_step(statement) != SQLITE_DONE {
-                print("Error update database!")
+            if sqlite3_step(statement) == SQLITE_ROW {
+                date = Int(sqlite3_column_int(statement, 0))
             }
         }
-    }
-    
-    func updateDedDate(name: String, date: Date) {
-        let query = "UPDATE BackupInfo SET dedDate=? WHERE BackupName=?"
-        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
-            sqlite3_bind_int(statement, 1, Int32(date.timeIntervalSince1970))
-            sqlite3_bind_text(statement, 2, name, -1, nil)
-            
-            if sqlite3_step(statement) != SQLITE_DONE {
-                print("Error update database!")
-            }
-        }
+        return date
     }
 }
 
@@ -123,6 +138,9 @@ class Backuper {
     let BACKUP_SON_NAME = "son"
     let BACKUP_DAD_NAME = "dad"
     let BACKUP_DED_NAME = "ded"
+    let SON_BACKUP_INTERVAL = 86400
+    let DAD_BACKUP_INTERVAL = 86400 * 7
+    let DED_BACKUP_INTERVAL = 86400 * 28
     private var backupItemsList: [Item] = []
     private let backupSourceDir: String
     private let backupDestinationPath: String
@@ -132,6 +150,7 @@ class Backuper {
     private let fm = FileManager.default
     private let sourceIdentifier: String
     private var db = Database.shared
+    private let backupDate: Date
     
     
     init(args: [String]) {
@@ -141,6 +160,7 @@ class Backuper {
         sonDestinationPath = backupDestinationPath + "/" + sourceIdentifier + "/" + BACKUP_SON_NAME
         dadDestinationPath = backupDestinationPath + "/" + sourceIdentifier + "/" + BACKUP_DAD_NAME
         dedDestinationPath = backupDestinationPath + "/" + sourceIdentifier + "/" + BACKUP_DED_NAME
+        backupDate = Date()
     }
 
     private func checkExist(atPath: String) -> (Bool, Bool) {
@@ -196,8 +216,31 @@ class Backuper {
         }
     }
     
-    private func rotate() throws {
+    private func sonBackup() {
         
+    }
+    
+    private func dadBackup() {
+        
+    }
+    
+    private func dedBackup() {
+        
+    }
+    
+    private func rotate() throws {
+        let currDate = Int(backupDate.timeIntervalSince1970)
+        let sonDate = db.getDate(name: sourceIdentifier, type: BackupInfo.BackupType.son)
+        let dadDate = db.getDate(name: sourceIdentifier, type: BackupInfo.BackupType.dad)
+        let dedDate = db.getDate(name: sourceIdentifier, type: BackupInfo.BackupType.ded)
+        
+        if currDate - dedDate! < DED_BACKUP_INTERVAL {
+            if currDate - dadDate! < DAD_BACKUP_INTERVAL {
+                if currDate - sonDate! >= SON_BACKUP_INTERVAL {
+                    sonBackup()
+                }
+            } else { dadBackup() }
+        } else { dedBackup() }
     }
     
     // MARK: Run
