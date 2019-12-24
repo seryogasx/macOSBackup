@@ -151,6 +151,8 @@ class Backuper {
     private let sourceIdentifier: String
     private var db = Database.shared
     private let backupDate: Date
+    private var sonSubFolders: [String] = []
+    private var dadSubFolders: [String] = []
     
     
     init(args: [String]) {
@@ -161,6 +163,22 @@ class Backuper {
         dadDestinationPath = backupDestinationPath + "/" + sourceIdentifier + "/" + BACKUP_DAD_NAME
         dedDestinationPath = backupDestinationPath + "/" + sourceIdentifier + "/" + BACKUP_DED_NAME
         backupDate = Date()
+        subfoldersInit()
+    }
+    
+    private func subfoldersInit() {
+        sonSubFolders.append(String(sonDestinationPath + "/1"))
+        sonSubFolders.append(String(sonDestinationPath + "/2"))
+        sonSubFolders.append(String(sonDestinationPath + "/3"))
+        sonSubFolders.append(String(sonDestinationPath + "/4"))
+        sonSubFolders.append(String(sonDestinationPath + "/5"))
+        sonSubFolders.append(String(sonDestinationPath + "/6"))
+        sonSubFolders.append(String(sonDestinationPath + "/7"))
+        
+        dadSubFolders.append(String(dadDestinationPath + "/1"))
+        dadSubFolders.append(String(dadDestinationPath + "/2"))
+        dadSubFolders.append(String(dadDestinationPath + "/3"))
+        dadSubFolders.append(String(dadDestinationPath + "/4"))
     }
 
     private func checkExist(atPath: String) -> (Bool, Bool) {
@@ -189,12 +207,20 @@ class Backuper {
     private func checkBackupFolders() throws {
         
         switch checkExist(atPath: sonDestinationPath) {
-            case(false, _): try initFolder(path: sonDestinationPath)
+            case(false, _):
+                try initFolder(path: sonDestinationPath)
+                for i in sonSubFolders {
+                        try initFolder(path: i)
+                }
             default: ()
         }
         
         switch checkExist(atPath: dadDestinationPath) {
-            case(false, _): try initFolder(path: dadDestinationPath)
+            case(false, _):
+                try initFolder(path: dadDestinationPath)
+                for i in dadSubFolders {
+                        try initFolder(path: i)
+                }
             default: ()
         }
         
