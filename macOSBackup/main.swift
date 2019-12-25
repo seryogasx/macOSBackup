@@ -197,6 +197,8 @@ class Backuper {
     private let backupDate: Date
     private var sonSubFolders: [String] = []
     private var dadSubFolders: [String] = []
+    private let remoteBackupDestination: String
+    private let remoteBackupSource: String
     
     
     init(args: [String]) {
@@ -207,6 +209,8 @@ class Backuper {
         dadDestinationPath = backupDestinationPath + "/" + sourceIdentifier + "/" + BACKUP_DAD_NAME
         dedDestinationPath = backupDestinationPath + "/" + sourceIdentifier + "/" + BACKUP_DED_NAME
         backupDate = Date()
+        remoteBackupDestination = "st255@ohvost.ru:/home/st/st255/macOSBackup/\(sourceIdentifier)/"
+        remoteBackupSource = "\(backupSourceDir)/\(sourceIdentifier)/ded/"
         subfoldersInit()
     }
     
@@ -225,6 +229,14 @@ class Backuper {
         dadSubFolders.append(String(dadDestinationPath + "/4"))
     }
 
+    private func sendDed() throws {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/rsync")
+        task.arguments = ["-ru", "--delete", remoteBackupSource, remoteBackupDestination]
+        try task.run()
+
+    }
+    
     private func checkExist(atPath: String) -> (Bool, Bool) {
         var isDir = ObjCBool(true)
         let exists = fm.fileExists(atPath: atPath, isDirectory: &isDir)
@@ -291,6 +303,11 @@ class Backuper {
         for i in backupItemsList {
             try fm.copyItem(atPath: i.fullPath, toPath: dedDestinationPath + "/" + i.name)
         }
+        do {
+            try sendDed()
+        } catch {
+            print("Ded first backup doesn't send!")
+        }
     }
     
     private func sonBackup() throws {
@@ -348,7 +365,11 @@ class Backuper {
         db.updateDate(name: sourceIdentifier, date: backupDate, type: BackupInfo.BackupType.dad)
         db.updateDate(name: sourceIdentifier, date: backupDate, type: BackupInfo.BackupType.ded)
         db.updateDate(name: sourceIdentifier, date: backupDate, type: BackupInfo.BackupType.son)
-        
+        do {
+            try sendDed()
+        } catch {
+            print("Ded backup doesn't send!")
+        }
     }
     
     private func rotate() throws {
