@@ -63,7 +63,7 @@ class Database {
     }
     
     func tableInit() {
-        let query = "CREATE TABLE IF NOT EXISTS BackupInfo (BackupName varchar(64) primary key, dedDate integer, dadDate integer, sonDate ineteger); "
+        let query = "CREATE TABLE IF NOT EXISTS BackupInfo (BackupName varchar(64) primary key, dedDate integer, dadDate integer, sonDate ineteger, dadState integer, sonState integer); "
         
         if sqlite3_exec(db, query, nil, nil, nil) != SQLITE_OK {
             print("Error creating Tables!")
@@ -71,12 +71,14 @@ class Database {
     }
     
     func addNewItem(info: BackupInfo) {
-        let query = "INSERT INTO BackupInfo (BackupName, dedDate, dadDate, sonDate) VALUES (?, ?, ?, ?)"
+        let query = "INSERT INTO BackupInfo (BackupName, dedDate, dadDate, sonDate, dadState, sonState) VALUES (?, ?, ?, ?, ?, ?)"
         if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
             sqlite3_bind_text(statement, 1, info.hashName, -1, nil)
             sqlite3_bind_int(statement, 2, Int32(info.dedDate.timeIntervalSince1970))
             sqlite3_bind_int(statement, 3, Int32(info.dadDate.timeIntervalSince1970))
             sqlite3_bind_int(statement, 4, Int32(info.sonDate.timeIntervalSince1970))
+            sqlite3_bind_int(statement, 5, 1)
+            sqlite3_bind_int(statement, 6, 1)
             
             if sqlite3_step(statement) != SQLITE_DONE {
                 print("Error add new item to database!")
@@ -128,6 +130,47 @@ class Database {
         }
         return date
     }
+    
+    func updateState(name: String, type: BackupInfo.BackupType, state: Int) {
+        var mode = ""
+        switch type.rawValue {
+        case 2:
+            mode="dadState"
+        case 3:
+            mode="sonState"
+        default: ()
+        }
+        let query = "UPDATE BackupInfo SET \(mode)=? WHERE BackupName=?"
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_int(statement, 1, Int32(state))
+            sqlite3_bind_text(statement, 2, name, -1, nil)
+            
+            if sqlite3_step(statement) != SQLITE_DONE {
+                print("Error update database!")
+            }
+        }
+    }
+    
+    func getState(name: String, type: BackupInfo.BackupType) -> Int? {
+        var state: Int?
+        var mode = ""
+        switch type.rawValue {
+        case 2:
+            mode="dadState"
+        case 3:
+            mode="sonState"
+        default: ()
+        }
+        let query = "SELECT \(mode) FROM BackupInfo WHERE BackupName=?"
+        if sqlite3_prepare_v2(db, query, -1, &statement, nil) == SQLITE_OK {
+            sqlite3_bind_text(statement, 1, name, -1, nil)
+            
+            if sqlite3_step(statement) == SQLITE_ROW {
+                state = Int(sqlite3_column_int(statement, 0))
+            }
+        }
+        return state
+    }
 }
 
 
@@ -138,7 +181,7 @@ class Backuper {
     let BACKUP_SON_NAME = "son"
     let BACKUP_DAD_NAME = "dad"
     let BACKUP_DED_NAME = "ded"
-    let SON_BACKUP_INTERVAL = 86400
+    let SON_BACKUP_INTERVAL = 1
     let DAD_BACKUP_INTERVAL = 86400 * 7
     let DED_BACKUP_INTERVAL = 86400 * 28
     private var backupItemsList: [Item] = []
@@ -191,13 +234,13 @@ class Backuper {
         try fm.createDirectory(atPath: path, withIntermediateDirectories: true, attributes: nil)
     }
     
-    private func getItemsAtDir(dir: URL) throws {
-        for i in try fm.contentsOfDirectory(atPath: dir.path) {
-            let checkItemPath = dir.path + "/" + i
+    private func getItemsAtDir(dir: String, _ add_param: String = "") throws {
+        for i in try fm.contentsOfDirectory(atPath: dir) {
+            let checkItemPath = dir + "/" + i
             switch checkExist(atPath: checkItemPath) {
                 case(true, _):
                     let modifyDate = try fm.attributesOfItem(atPath: checkItemPath)[.modificationDate]
-                    let name = fm.displayName(atPath: checkItemPath)
+                    let name = add_param + fm.displayName(atPath: checkItemPath)
                     backupItemsList.append(Item(modificationDate: modifyDate as! Date, fullPath: checkItemPath, name: name))
             default: throw BackuperError.itemNotExists(path: i)
             }
@@ -212,7 +255,11 @@ class Backuper {
                 for i in sonSubFolders {
                         try initFolder(path: i)
                 }
-            default: ()
+            default:
+                try initFolder(path: sonDestinationPath)
+                for i in sonSubFolders {
+                        try initFolder(path: i)
+                }
         }
         
         switch checkExist(atPath: dadDestinationPath) {
@@ -221,12 +268,16 @@ class Backuper {
                 for i in dadSubFolders {
                         try initFolder(path: i)
                 }
-            default: ()
+            default:
+                try initFolder(path: dadDestinationPath)
+                for i in dadSubFolders {
+                        try initFolder(path: i)
+                }
         }
         
         switch checkExist(atPath: dedDestinationPath) {
             case(false, _): try initFolder(path: dedDestinationPath)
-            default: ()
+            default: try initFolder(path: dedDestinationPath)
         }
     }
     
@@ -235,22 +286,67 @@ class Backuper {
     }
     
     private func firstBackup() throws {
-        let currDate = Date()
-        db.addNewItem(info: BackupInfo(hashName: sourceIdentifier, dedDate: currDate, dadDate: currDate, sonDate: currDate))
+        db.addNewItem(info: BackupInfo(hashName: sourceIdentifier, dedDate: backupDate, dadDate: backupDate, sonDate: backupDate))
         for i in backupItemsList {
             try fm.copyItem(atPath: i.fullPath, toPath: dedDestinationPath + "/" + i.name)
         }
     }
     
-    private func sonBackup() {
+    private func sonBackup() throws {
+        var state = db.getState(name: sourceIdentifier, type: BackupInfo.BackupType.son)
+        var updateList: [Item] = []
+        let lastSonUpdateData = db.getDate(name: sourceIdentifier, type: BackupInfo.BackupType.son)
+        for i in backupItemsList {
+            if Int(i.modificationDate.timeIntervalSince1970) > lastSonUpdateData! {
+                updateList.append(i)
+            }
+        }
         
+        if state! == 8 {
+            for j in sonSubFolders {
+                try fm.removeItem(atPath: j)
+            }
+            try checkBackupFolders()
+            try dadBackup()
+            state = 1;
+        }
+        if updateList.count > 0 {
+            for i in updateList {
+                try fm.copyItem(atPath: i.fullPath, toPath: sonSubFolders[state! - 1] + "/" + i.name)
+            }
+            
+            db.updateState(name: sourceIdentifier, type: BackupInfo.BackupType.son, state: state! + 1)
+            db.updateDate(name: sourceIdentifier, date: backupDate, type: BackupInfo.BackupType.son)
+        }
     }
     
-    private func dadBackup() {
+    private func dadBackup() throws {
+        var state = db.getState(name: sourceIdentifier, type: BackupInfo.BackupType.dad)
+        if state! == 5 {
+            for j in dadSubFolders {
+                try fm.removeItem(atPath: j)
+            }
+            try checkBackupFolders()
+            try dedBackup()
+            state = 1;
+        }
         
+        for i in backupItemsList {
+            try fm.copyItem(atPath: i.fullPath, toPath: dadSubFolders[state! - 1]  + "/" + i.name)
+        }
+        db.updateState(name: sourceIdentifier, type: BackupInfo.BackupType.dad, state: state! + 1)
+        db.updateDate(name: sourceIdentifier, date: backupDate, type: BackupInfo.BackupType.dad)
     }
     
-    private func dedBackup() {
+    private func dedBackup() throws {
+        try fm.removeItem(atPath: dedDestinationPath)
+        try checkBackupFolders()
+        for i in backupItemsList {
+            try fm.copyItem(atPath: i.fullPath, toPath: dedDestinationPath + "/" + i.name)
+        }
+        db.updateDate(name: sourceIdentifier, date: backupDate, type: BackupInfo.BackupType.dad)
+        db.updateDate(name: sourceIdentifier, date: backupDate, type: BackupInfo.BackupType.ded)
+        db.updateDate(name: sourceIdentifier, date: backupDate, type: BackupInfo.BackupType.son)
         
     }
     
@@ -263,17 +359,17 @@ class Backuper {
         if currDate - dedDate! < DED_BACKUP_INTERVAL {
             if currDate - dadDate! < DAD_BACKUP_INTERVAL {
                 if currDate - sonDate! >= SON_BACKUP_INTERVAL {
-                    sonBackup()
+                    try sonBackup()
                 }
-            } else { dadBackup() }
-        } else { dedBackup() }
+            } else { try dadBackup() }
+        } else { try dedBackup() }
     }
     
     // MARK: Run
     func run() -> String {
         var error: String?
         do {
-            try getItemsAtDir(dir: URL(string: backupSourceDir)!)
+            try getItemsAtDir(dir: backupSourceDir)
             if backupItemsList.isEmpty {
                 throw BackuperError.emptyBackup
             }
