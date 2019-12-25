@@ -1,3 +1,4 @@
+#!/usr/bin/swift
 import Foundation
 import CryptoKit
 import SQLite3
@@ -181,7 +182,7 @@ class Backuper {
     let BACKUP_SON_NAME = "son"
     let BACKUP_DAD_NAME = "dad"
     let BACKUP_DED_NAME = "ded"
-    let SON_BACKUP_INTERVAL = 1
+    let SON_BACKUP_INTERVAL = 86400
     let DAD_BACKUP_INTERVAL = 86400 * 7
     let DED_BACKUP_INTERVAL = 86400 * 28
     private var backupItemsList: [Item] = []
