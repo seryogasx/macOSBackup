@@ -64,7 +64,7 @@ class Database {
     }
     
     func tableInit() {
-        let query = "CREATE TABLE IF NOT EXISTS BackupInfo (BackupName varchar(64) primary key, dedDate integer, dadDate integer, sonDate ineteger, dadState integer, sonState integer); "
+        let query = "CREATE TABLE IF NOT EXISTS BackupInfo (BackupName varchar(64) primary key, dedDate integer, dadDate integer, sonDate integer, dadState integer, sonState integer); "
         
         if sqlite3_exec(db, query, nil, nil, nil) != SQLITE_OK {
             print("Error creating Tables!")
