@@ -16,7 +16,7 @@
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "239"
             endingLineNumber = "239"
-            landmarkName = "getItemsAtDir(dir:_:)"
+            landmarkName = "run()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -31,9 +31,7 @@
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "371"
-            endingLineNumber = "371"
-            landmarkName = "run()"
-            landmarkType = "7">
+            endingLineNumber = "371">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -47,9 +45,7 @@
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
             startingLineNumber = "355"
-            endingLineNumber = "355"
-            landmarkName = "rotate()"
-            landmarkType = "7">
+            endingLineNumber = "355">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>
